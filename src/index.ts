@@ -1,9 +1,30 @@
-import express, { type Express, type Request, type Response } from 'express'
+import express, {
+  type Express,
+  type NextFunction,
+  type Request,
+  type Response,
+} from 'express'
+import db from './db/index.ts'
 
 const app: Express = express()
 
-app.get('/', (_: Request, res: Response) => {
-  res.send('Hello World!')
-})
+function authMiddleware(req: Request, res: Response, next: NextFunction) {
+  const authHeader = req.headers['authorization']
+  const token = authHeader && authHeader.split(' ')[1]
+  if (!token) return res.sendStatus(401)
+  next()
+}
 
-app.listen(3000)
+app.use(authMiddleware)
+
+const server = app.listen(3000)
+
+const closeCallback = () => {
+  server.close(() => {
+    db.close()
+    process.exit(0)
+  })
+}
+
+process.on('SIGINT', closeCallback)
+process.on('SIGTERM', closeCallback)
