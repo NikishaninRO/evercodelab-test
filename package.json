@@ -18,6 +18,6 @@
     "node": ">=22.0.0"
   },
   "scripts": {
-    "start": "node --experimental-strip-types src/index.ts"
+    "start": "node --experimental-strip-types --env-file=.env src/index.ts"
   }
 }

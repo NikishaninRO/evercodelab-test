@@ -7,10 +7,10 @@ export const postAddCryptocurrencyHandler = (
   res: Response,
   db: Database
 ) => {
-  const sym = req.params['sym'] as string
-  const name = req.params['name'] as string
+  const sym = req.query['sym'] as string
+  const name = req.query['name'] as string
   const handleCallback = () => {
-    res.status(200)
+    res.status(200).send()
   }
   addCryptocurrency(db, { sym, name }, handleCallback)
 }

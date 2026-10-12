@@ -8,10 +8,15 @@ export const getPriceHistoryRawsHandler = (
   res: Response,
   db: Database
 ) => {
-  const sym = req.params['sym'] as string
-  const limit = req.params['limit']
+  const cryptocurrencyId = req.query['cryptocurrency_id'] as string
+  const limit = req.query['limit']
   const handleCallback = (raws: PriceHistoryRaw[]) => {
     res.status(200).send(raws)
   }
-  getPriceHistoryRawsBySym(db, sym, Number(limit), handleCallback)
+  getPriceHistoryRawsBySym(
+    db,
+    Number(cryptocurrencyId),
+    Number(limit ?? 10),
+    handleCallback
+  )
 }

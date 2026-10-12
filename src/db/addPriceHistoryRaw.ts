@@ -10,19 +10,17 @@ export const addPriceHistoryRaw = (
   db: Database,
   payload: PriceHistoryRawPayload
 ) => {
-  db.run('TRANSACTION START')
   db.get<CryptoCurrency>(
     'SELECT id FROM cryptocurrencies WHERE sym = ?',
     [payload.cryprocurrencySym],
-    (err: Error | null, raw: CryptoCurrency) => {
-      if (err == null && raw != null) {
+    (error: Error | null, raw: CryptoCurrency) => {
+      if (error == null && raw != null) {
         db.run(
-          'INSERT INTO price_history_raw (cryptocurrency_id, price, created_at) VALUES (?, ?, ?)',
+          'INSERT INTO price_history_raws (cryptocurrency_id, price, created_at) VALUES (?, ?, ?)',
           [raw.id, payload.price, Date.now()]
         )
-        db.run('COMMIT')
       } else {
-        db.run('ROLLBACK')
+        throw error
       }
     }
   )

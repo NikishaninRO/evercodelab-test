@@ -3,16 +3,18 @@ import type { PriceHistoryRaw } from '../types/index.ts'
 
 export const getPriceHistoryRawsBySym = (
   db: Database,
-  sym: string,
+  cryptocurrencyId: number,
   limit: number,
   handleCallback: (raws: PriceHistoryRaw[]) => void
 ) => {
   db.all<PriceHistoryRaw>(
-    'SELECT * FROM price_history_raw WHERE sym = ? LIMIT ?',
-    [sym, limit],
-    (err: Error | null, raws: PriceHistoryRaw[]) => {
-      if (err == null) {
+    'SELECT * FROM price_history_raws WHERE cryptocurrency_id = ? LIMIT ?',
+    [cryptocurrencyId, limit],
+    (error: Error | null, raws: PriceHistoryRaw[]) => {
+      if (error == null) {
         handleCallback(raws)
+      } else {
+        throw error
       }
     }
   )

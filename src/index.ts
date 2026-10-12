@@ -8,6 +8,8 @@ import db from './db/index.ts'
 import { getPriceHistoryRawsHandler } from './routeHandlers/getPriceHisrtoryRaws.ts'
 import { postAddCryptocurrencyHandler } from './routeHandlers/postAddCryptocurrency.ts'
 import { postRemoveCryptocurrencyHandler } from './routeHandlers/postRemoveCryptocurrency.ts'
+import { TaskScheduler } from './services/TaskScheduler.ts'
+import { CoinMarketCapApi } from './services/CoinMarketCapApi.ts'
 
 const app: Express = express()
 
@@ -24,22 +26,30 @@ app.get('/price_history_raws', (req: Request, res: Response) =>
   getPriceHistoryRawsHandler(req, res, db)
 )
 
-app.get('/add_cryptocurrency', (req: Request, res: Response) =>
+app.post('/add_cryptocurrency', (req: Request, res: Response) =>
   postAddCryptocurrencyHandler(req, res, db)
 )
 
-app.get('/remove_cryptocurrency', (req: Request, res: Response) =>
+app.post('/remove_cryptocurrency', (req: Request, res: Response) =>
   postRemoveCryptocurrencyHandler(req, res, db)
 )
 
 const server = app.listen(3000)
 
-const closeCallback = () => {
-  server.close(() => {
-    db.close()
-    process.exit(0)
-  })
-}
+try {
+  const taskScheduler = new TaskScheduler(new CoinMarketCapApi(db))
+  taskScheduler.start()
 
-process.on('SIGINT', closeCallback)
-process.on('SIGTERM', closeCallback)
+  const closeCallback = () => {
+    taskScheduler.stop()
+    server.close(() => {
+      db.close()
+      process.exit(0)
+    })
+  }
+
+  process.on('SIGINT', closeCallback)
+  process.on('SIGTERM', closeCallback)
+} catch (err) {
+  console.error(err)
+}

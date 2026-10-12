@@ -6,11 +6,13 @@ export const removeCryptocurrency = (
   handleCallback: () => void
 ) => {
   db.run(
-    'DELETE FROM cryptocurrencies WHERE sym = ?)',
+    'DELETE FROM cryptocurrencies WHERE sym = ?',
     [sym],
     (error: Error | null) => {
       if (error == null) {
         handleCallback()
+      } else {
+        throw error
       }
     }
   )

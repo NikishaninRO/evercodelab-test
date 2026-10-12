@@ -7,9 +7,9 @@ export const postRemoveCryptocurrencyHandler = (
   res: Response,
   db: Database
 ) => {
-  const sym = req.params['sym'] as string
+  const sym = req.query['sym'] as string
   const handleCallback = () => {
-    res.status(200)
+    res.status(200).send()
   }
   removeCryptocurrency(db, sym, handleCallback)
 }
