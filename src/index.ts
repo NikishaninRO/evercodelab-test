@@ -36,20 +36,20 @@ app.post('/remove_cryptocurrency', (req: Request, res: Response) =>
 
 const server = app.listen(3000)
 
+const taskScheduler = new TaskScheduler(new CoinMarketCapApi(db))
 try {
-  const taskScheduler = new TaskScheduler(new CoinMarketCapApi(db))
   taskScheduler.start()
-
-  const closeCallback = () => {
-    taskScheduler.stop()
-    server.close(() => {
-      db.close()
-      process.exit(0)
-    })
-  }
-
-  process.on('SIGINT', closeCallback)
-  process.on('SIGTERM', closeCallback)
 } catch (err) {
   console.error(err)
+} finally {
+  taskScheduler.stop()
 }
+
+const closeCallback = () => {
+  server.close(() => {
+    db.close()
+    process.exit(0)
+  })
+}
+process.on('SIGINT', closeCallback)
+process.on('SIGTERM', closeCallback)

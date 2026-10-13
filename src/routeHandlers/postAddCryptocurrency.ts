@@ -1,16 +1,34 @@
 import { type Request, type Response } from 'express'
 import type { Database } from 'sqlite3'
 import { addCryptocurrency } from '../db/addCryptocurrency.ts'
+import { validateParams } from '../utils/validateParams.ts'
+import {
+  nameParam,
+  sendValidationErrors,
+  symParam,
+} from './validation.ts'
 
 export const postAddCryptocurrencyHandler = (
   req: Request,
   res: Response,
   db: Database
 ) => {
-  const sym = req.query['sym'] as string
-  const name = req.query['name'] as string
-  const handleCallback = () => {
-    res.status(200).send()
+  const params = validateParams(req.query, {
+    sym: symParam,
+    name: nameParam,
+  })
+  if (!params.ok) {
+    sendValidationErrors(res, params.errors)
+    return
   }
-  addCryptocurrency(db, { sym, name }, handleCallback)
+
+  const { sym, name } = params.value
+  const handleCallback = () => {
+    res.sendStatus(200)
+  }
+  try {
+    addCryptocurrency(db, { sym, name }, handleCallback)
+  } catch (error) {
+    res.status(400).send({ error })
+  }
 }
