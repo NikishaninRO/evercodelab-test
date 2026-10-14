@@ -25,7 +25,6 @@
   },
   "scripts": {
     "start": "node --experimental-strip-types --env-file=.env src/index.ts",
-    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
-    "test:coverage": "node --experimental-vm-modules --experimental-test-coverage node_modules/jest/bin/jest.js --coverage"
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js"
   }
 }
