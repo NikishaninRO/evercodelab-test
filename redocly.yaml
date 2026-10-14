@@ -1,0 +1,6 @@
+extends:
+  - recommended
+
+rules:
+  # The service is only deployed locally for now, there is no public host yet.
+  no-server-example.com: off

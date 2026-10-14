@@ -1,0 +1,352 @@
+openapi: 3.1.0
+
+info:
+  title: Cryptocurrency Price History API
+  version: 1.0.0
+  summary: Tracks cryptocurrencies and their price history.
+  description: |
+    Small HTTP API around a SQLite database of cryptocurrencies and their raw
+    price quotes, polled from CoinMarketCap by a background task.
+
+    ## Authentication
+
+    Every endpoint requires an `Authorization: Bearer <token>` header. The
+    middleware only checks that a token is present, so any non-empty value is
+    accepted. A missing header returns `401`.
+
+    ## Parameters
+
+    All endpoints read their input from the query string, including the two
+    `POST` endpoints. Values are trimmed before validation, so leading and
+    trailing whitespace is ignored. A parameter that is repeated in the same
+    request (`?sym=BTC&sym=ETH`) is rejected with `must be provided exactly once`.
+
+    ## Errors
+
+    Invalid parameters return `400` with every failing field at once:
+
+    ```json
+    {
+      "error": "Invalid query parameters",
+      "errors": [
+        { "field": "limit", "message": "limit must be less than or equal to 1000" }
+      ]
+    }
+    ```
+  license:
+    name: MIT
+    identifier: MIT
+servers:
+  - url: http://localhost:3000
+    description: Local development server
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: cryptocurrencies
+    description: Create and remove tracked cryptocurrencies
+  - name: price history
+    description: Read raw price quotes collected by the background task
+
+paths:
+  /price_history_raws:
+    get:
+      tags: [price history]
+      operationId: getPriceHistoryRaws
+      summary: List raw price history rows of a cryptocurrency
+      description: |
+        Returns raw price quotes of a single cryptocurrency, newest first as they
+        were appended by the background task.
+
+        `cryptocurrency_id` is the database identifier of a cryptocurrency
+        (`POST /add_cryptocurrency` does not return it, so it has to be read out
+        of the database or returned by a future listing endpoint).
+      parameters:
+        - $ref: '#/components/parameters/CryptocurrencyId'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Matching price history rows.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PriceHistoryRaw'
+              examples:
+                limited:
+                  summary: Two rows of cryptocurrency 10
+                  value:
+                    - id: 1
+                      cryptocurrency_id: 10
+                      price: 82648.2569062802
+                      created_at: 1791820476071
+                    - id: 2
+                      cryptocurrency_id: 10
+                      price: 82648.2569062802
+                      created_at: 1791820476132
+                empty:
+                  summary: Cryptocurrency without collected quotes
+                  value: []
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /add_cryptocurrency:
+    post:
+      tags: [cryptocurrencies]
+      operationId: addCryptocurrency
+      summary: Track a cryptocurrency
+      description: |
+        Adds a cryptocurrency to the tracked list so the background task starts
+        polling its price.
+
+        The operation is idempotent in `sym`: adding a cryptocurrency that is
+        already tracked returns `200` and leaves the stored row untouched.
+
+        The response carries no identifier, so a client cannot learn the
+        `cryptocurrency_id` that `GET /price_history_raws` requires.
+      parameters:
+        - $ref: '#/components/parameters/Sym'
+        - $ref: '#/components/parameters/Name'
+      responses:
+        '200':
+          description: Cryptocurrency is tracked.
+          content:
+            text/plain:
+              schema:
+                type: string
+                const: OK
+              examples:
+                added:
+                  value: OK
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /remove_cryptocurrency:
+    post:
+      tags: [cryptocurrencies]
+      operationId: removeCryptocurrency
+      summary: Stop tracking a cryptocurrency
+      description: |
+        Removes a cryptocurrency by its `sym`. Price history rows of the removed
+        cryptocurrency are kept, because the quotes are only referenced by id and
+        are not cascade deleted.
+
+        Removing a symbol that is not tracked is not an error and returns `200`.
+      parameters:
+        - $ref: '#/components/parameters/Sym'
+      responses:
+        '200':
+          description: Cryptocurrency is no longer tracked.
+          content:
+            text/plain:
+              schema:
+                type: string
+                const: OK
+              examples:
+                removed:
+                  value: OK
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: |
+        Only the presence of a token is validated, the value is not verified.
+
+  parameters:
+    CryptocurrencyId:
+      name: cryptocurrency_id
+      in: query
+      required: true
+      description: Database identifier of a cryptocurrency.
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+      example: 10
+
+    Limit:
+      name: limit
+      in: query
+      required: false
+      description: Maximum number of rows to return.
+      schema:
+        type: integer
+        format: int32
+        minimum: 1
+        maximum: 1000
+        default: 10
+      example: 10
+
+    Sym:
+      name: sym
+      in: query
+      required: true
+      description: Ticker symbol of a cryptocurrency.
+      schema:
+        type: string
+        minLength: 2
+        maxLength: 10
+        pattern: '^[A-Za-z0-9]+$'
+      example: BTC
+
+    Name:
+      name: name
+      in: query
+      required: true
+      description: |
+        Human readable name. It is converted to a slug and sent to CoinMarketCap,
+        so it has to match a currency listed there.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 100
+      example: Bitcoin
+
+  responses:
+    Unauthorized:
+      description: 'The `Authorization: Bearer <token>` header is missing.'
+      content:
+        text/plain:
+          schema:
+            type: string
+            example: Unauthorized
+
+    ValidationError:
+      description: |
+        Either invalid query parameters or a database failure.
+
+        Invalid parameters are reported per field, all failing fields at once.
+
+        The same `400` is also returned for database failures, so the two cases
+        are distinguishable only by the body: a validation failure has `errors`,
+        a database failure carries the serialized driver error under `error`.
+        A database failure should be a `5xx`, this is a known deviation from the
+        contract.
+      content:
+        application/json:
+          schema:
+            oneOf:
+              - $ref: '#/components/schemas/ValidationErrorResponse'
+              - $ref: '#/components/schemas/DatabaseErrorResponse'
+          examples:
+            outOfRange:
+              summary: Non-integer id and out of range limit
+              value:
+                error: Invalid query parameters
+                errors:
+                  - field: cryptocurrency_id
+                    message: cryptocurrency_id must be an integer
+                  - field: limit
+                    message: limit must be less than or equal to 1000
+            missing:
+              summary: Required parameter is missing
+              value:
+                error: Invalid query parameters
+                errors:
+                  - field: cryptocurrency_id
+                    message: cryptocurrency_id is required
+            malformedSym:
+              summary: Symbol contains unsupported characters
+              value:
+                error: Invalid query parameters
+                errors:
+                  - field: sym
+                    message: sym must contain only latin letters and digits
+            duplicated:
+              summary: Parameter is provided more than once
+              value:
+                error: Invalid query parameters
+                errors:
+                  - field: sym
+                    message: sym must be provided exactly once
+            databaseFailure:
+              summary: Database failure, no field information available
+              value:
+                error:
+                  errno: 1
+                  code: SQLITE_ERROR
+
+  schemas:
+    PriceHistoryRaw:
+      type: object
+      required: [id, cryptocurrency_id, price, created_at]
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: Row identifier.
+        cryptocurrency_id:
+          type: integer
+          format: int64
+          description: Identifier of the cryptocurrency the quote belongs to.
+        price:
+          type: number
+          format: double
+          description: Price in USD.
+        created_at:
+          type: integer
+          format: int64
+          description: |
+            Creation time as Unix time in milliseconds. The column is declared as
+            `DATETIME`, but a millisecond timestamp is what is stored.
+      additionalProperties: true
+
+    ValidationError:
+      type: object
+      required: [field, message]
+      properties:
+        field:
+          type: string
+          description: Query parameter name the error refers to.
+        message:
+          type: string
+          description: Human readable reason, e.g. `must be an integer`.
+
+    ValidationErrorResponse:
+      type: object
+      required: [error, errors]
+      properties:
+        error:
+          type: string
+          const: Invalid query parameters
+        errors:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/ValidationError'
+
+    DatabaseErrorResponse:
+      type: object
+      required: [error]
+      description: |
+        Body of a database failure. Only the enumerable properties of the thrown
+        error survive `JSON.stringify`, so the shape depends on what was thrown:
+        `sqlite3` driver errors expose `errno` and `code`, while a plain `Error`
+        (for example a programming error) serializes to an empty object and the
+        client gets no reason at all.
+      properties:
+        error:
+          type: object
+          additionalProperties: true
+          properties:
+            errno:
+              type: integer
+              description: '`sqlite3` error code, `1` is `SQLITE_ERROR`.'
+            code:
+              type: string
+              description: Symbolic name of the `sqlite3` error.
+          example:
+            errno: 1
+            code: SQLITE_ERROR
