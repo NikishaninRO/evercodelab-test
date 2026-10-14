@@ -4,7 +4,7 @@ import { removeCryptocurrency } from '../db/removeCryptocurrency.ts'
 import { validateParams } from '../utils/validateParams.ts'
 import { sendValidationErrors, symParam } from './validation.ts'
 
-export const postRemoveCryptocurrencyHandler = (
+export const postRemoveCryptocurrencyHandler = async (
   req: Request,
   res: Response,
   db: Database
@@ -18,11 +18,11 @@ export const postRemoveCryptocurrencyHandler = (
   }
 
   const { sym } = params.value
-  const handleCallback = () => {
-    res.sendStatus(200)
-  }
   try {
-    removeCryptocurrency(db, sym, handleCallback)
+    await new Promise((resolve, reject) =>
+      removeCryptocurrency(db, sym, resolve, reject)
+    )
+    res.sendStatus(200)
   } catch (error) {
     res.status(400).send({ error })
   }

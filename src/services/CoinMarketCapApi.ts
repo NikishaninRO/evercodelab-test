@@ -33,31 +33,30 @@ export class CoinMarketCapApi {
     }
   }
 
-  public async getCurrencies() {
-    const handleCallback = async (raws: CryptoCurrency[]) => {
-      if (raws.length === 0) {
-        return
-      }
-      const params = {
-        slug: raws.map((raw) => convertToSlug(raw.name ?? '')).join(','),
-        convert: 'USD',
-      }
-      try {
-        const response = await axios.get<QuotesResponse>(
-          `${this.url}/v3/cryptocurrency/quotes/latest`,
-          { headers: this.headers, params, timeout: 5000 }
-        )
-        for (const currency of response.data.data) {
-          addPriceHistoryRaw(this.db, {
-            cryprocurrencySym: currency.symbol,
-            price: currency.quote[0].price,
-          })
-        }
-      } catch (err) {
-        throw err
-      }
-    }
+  private readCryptocurrencies(): Promise<CryptoCurrency[]> {
+    return new Promise((resolve, reject) => {
+      getCryptocurrencies(this.db, resolve, reject)
+    })
+  }
 
-    getCryptocurrencies(this.db, handleCallback)
+  public async getCurrencies(): Promise<void> {
+    const raws = await this.readCryptocurrencies()
+    if (raws.length === 0) {
+      return
+    }
+    const params = {
+      slug: raws.map((raw) => convertToSlug(raw.name ?? '')).join(','),
+      convert: 'USD',
+    }
+    const response = await axios.get<QuotesResponse>(
+      `${this.url}/v3/cryptocurrency/quotes/latest`,
+      { headers: this.headers, params, timeout: 5000 }
+    )
+    for (const currency of response.data.data) {
+      addPriceHistoryRaw(this.db, {
+        cryprocurrencySym: currency.symbol,
+        price: currency.quote[0].price,
+      })
+    }
   }
 }

@@ -5,7 +5,8 @@ export const getPriceHistoryRawsBySym = (
   db: Database,
   cryptocurrencyId: number,
   limit: number,
-  handleCallback: (raws: PriceHistoryRaw[]) => void
+  handleCallback: (raws: PriceHistoryRaw[]) => void,
+  handleError: (error: Error) => void
 ) => {
   db.all<PriceHistoryRaw>(
     'SELECT * FROM price_history_raws WHERE cryptocurrency_id = ? LIMIT ?',
@@ -14,7 +15,7 @@ export const getPriceHistoryRawsBySym = (
       if (error == null) {
         handleCallback(raws)
       } else {
-        throw error
+        handleError(error)
       }
     }
   )

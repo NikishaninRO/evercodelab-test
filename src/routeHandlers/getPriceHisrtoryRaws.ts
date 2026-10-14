@@ -9,13 +9,13 @@ import {
   sendValidationErrors,
 } from './validation.ts'
 
-export const getPriceHistoryRawsHandler = (
+export const getPriceHistoryRawsHandler = async (
   req: Request,
   res: Response,
   db: Database
 ) => {
   const params = validateParams(req.query, {
-    cryptocurrencyId: cryptocurrencyIdParam,
+    cryptocurrency_id: cryptocurrencyIdParam,
     limit: limitParam,
   })
   if (!params.ok) {
@@ -23,12 +23,12 @@ export const getPriceHistoryRawsHandler = (
     return
   }
 
-  const { cryptocurrencyId: cryptocurrencyId, limit } = params.value
-  const handleCallback = (raws: PriceHistoryRaw[]) => {
-    res.status(200).send(raws)
-  }
+  const { cryptocurrency_id: cryptocurrencyId, limit } = params.value
   try {
-    getPriceHistoryRawsBySym(db, cryptocurrencyId, limit, handleCallback)
+    const raws = await new Promise<PriceHistoryRaw[]>((resolve, reject) =>
+      getPriceHistoryRawsBySym(db, cryptocurrencyId, limit, resolve, reject)
+    )
+    res.status(200).send(raws)
   } catch (error) {
     res.status(400).send({ error })
   }

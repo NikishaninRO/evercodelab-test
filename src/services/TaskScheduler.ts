@@ -13,14 +13,23 @@ export class TaskScheduler {
     )
   }
 
+  private runTask = async () => {
+    try {
+      await this.coinMarketCapApi.getCurrencies()
+    } catch (error) {
+      console.error('TaskScheduler: background task has failed', error)
+    }
+  }
+
   public start() {
     this.taskId = setInterval(
-      () => this.coinMarketCapApi.getCurrencies(),
+      this.runTask,
       this.coinMarketCapApiRequestFreq
     )
   }
 
   public stop() {
     clearInterval(this.taskId)
+    this.taskId = undefined
   }
 }
